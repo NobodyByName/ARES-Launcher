@@ -42,7 +42,7 @@ Limitations:
 
 | Repository | What it is |
 | --- | --- |
-| ARES-Server | The servers: ARES-Host (backend: sign-in, main menu, matchmaking) and ARES-Raid (runs the raid) |
+| [ARES-Server](https://github.com/NobodyByName/ARES-Server) | The servers: ARES-Host (backend: sign-in, main menu, matchmaking) and ARES-Raid (runs the raid) |
 | ARES-Launcher | This player app: server list; starts the stock game for the chosen server |
 
 ARES supports one game build at a time: **Steam build 26159202**. The launcher depends on no
@@ -53,8 +53,8 @@ ARES-Server code and works with any ARES-Host for the game build installed on th
 - The .NET 10 SDK (version in `global.json`) to build and run from source.
 - An installed copy of the supported game build to run the launcher and its self-checks.
 - The game's archive keys: provided by the ARES-Host you play on, or entered in Settings. The
-  self-checks take them as a file. Where to find them and the file format are in the ARES-Server
-  README ("Archive keys").
+  self-checks take them as a file. Where to find them and the file format are in the
+  [ARES-Server README](https://github.com/NobodyByName/ARES-Server#archive-keys).
 - Linux: Steam with Proton, the game launched once from Steam (this creates its Proton prefix), and
   WebKitGTK 4.1 for the window (often packaged as `webkit2gtk-4.1` or `libwebkit2gtk-4.1-0`).
 - Windows: not tested yet.

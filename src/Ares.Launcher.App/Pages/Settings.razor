@@ -1,0 +1,112 @@
+@page "/settings"
+@inject LauncherPaths Paths
+
+<div class="titlebar"><h1>Settings</h1></div>
+
+@if (_message is not null)
+{
+    <div class="notice @_messageKind" role="status">@_message</div>
+}
+
+<div class="card">
+    <div class="form">
+        <div class="field">
+            <label for="game-folder">Game folder</label>
+            <input id="game-folder" @bind="_game" placeholder="@(_detectedGame ?? "Not found")" aria-describedby="game-help" />
+            <p id="game-help" class="hint">Leave blank to find the game in Steam.</p>
+        </div>
+        @if (!OperatingSystem.IsWindows())
+        {
+            <div class="field">
+                <label for="steam-folder">Steam folder</label>
+                <input id="steam-folder" @bind="_steam" placeholder="@(_detectedSteam ?? "Not found")" aria-describedby="steam-help" />
+                <p id="steam-help" class="hint">Leave blank to use your Steam installation.</p>
+            </div>
+            <div class="field">
+                <label for="proton-path">Proton</label>
+                <input id="proton-path" @bind="_proton" placeholder="@(_detectedProton ?? "Not found")" aria-describedby="proton-help" />
+                <p id="proton-help" class="hint">Optional path to a Proton script. Uses the game's version by default.</p>
+            </div>
+        }
+        <div class="field">
+            <label for="pak-key">Archive keys</label>
+            <input id="pak-key" @bind="_pakKey" placeholder="Pak key (64 hex digits)" aria-describedby="keys-help" spellcheck="false" />
+            <input id="container-key" @bind="_containerKey" placeholder="Container key (8 hex words)" aria-label="Container key" aria-describedby="keys-help" spellcheck="false" />
+            <p id="keys-help" class="hint">Leave blank to use the keys your server provides. The launcher needs them to read your game files.</p>
+        </div>
+        <button class="primary" @onclick="Save">Save settings</button>
+    </div>
+</div>
+
+<details class="card about">
+    <summary>About ARES</summary>
+    <div class="about-content">
+        <p>The launcher uses your own ARC Raiders files and starts the original game. Game files, Steam settings and the running game are never modified.</p>
+        <div class="field">
+            <span class="field-label">Version</span>
+            <code>@LauncherVersion.Current</code>
+        </div>
+        <div class="field">
+            <span class="field-label">Profiles and configs</span>
+            <code>@Paths.DataDirectory</code>
+        </div>
+        <p>ARES is an independent, unofficial project, not affiliated with, endorsed by or sponsored by Embark Studios. ARC Raiders and related names and trademarks belong to their respective owners.</p>
+        <p>Free software under the GNU General Public License, version 3 or later.</p>
+    </div>
+</details>
+
+@code {
+    private string? _game, _steam, _proton, _pakKey, _containerKey, _detectedGame, _detectedSteam, _detectedProton;
+    private string? _message;
+    private string _messageKind = "info";
+
+    protected override void OnInitialized()
+    {
+        LauncherSettings s = LauncherSettings.Load(Paths);
+        (_game, _steam, _proton, _pakKey, _containerKey) = (s.GameDirectory, s.SteamDirectory, s.ProtonPath, s.PakKey, s.ContainerKey);
+        _detectedSteam = GameInstall.FindSteamRoot();
+        _detectedGame = GameInstall.FindGameDirectory(_steam is { Length: > 0 } ? _steam : null);
+        string? compat = _detectedGame is null ? null : GameInstall.FindCompatData(_detectedGame);
+        if (!OperatingSystem.IsWindows()) _detectedProton = GameInstall.FindProton(_detectedSteam, compat);
+    }
+
+    private void Save()
+    {
+        if (_game is { Length: > 0 } && !GameInstall.IsValidGameDirectory(_game))
+        {
+            _message = "That folder does not contain ARC Raiders (PioneerGame/Binaries/Win64/PioneerGame.exe).";
+            _messageKind = "error";
+            return;
+        }
+        bool hasPakKey = !string.IsNullOrWhiteSpace(_pakKey);
+        if (hasPakKey != !string.IsNullOrWhiteSpace(_containerKey))
+        {
+            _message = "Enter both archive keys, or leave both blank.";
+            _messageKind = "error";
+            return;
+        }
+        if (hasPakKey)
+        {
+            try
+            {
+                ArchiveKeys.Parse(_pakKey!, _containerKey!);
+            }
+            catch (FormatException e)
+            {
+                _message = e.Message;
+                _messageKind = "error";
+                return;
+            }
+        }
+        new LauncherSettings
+        {
+            GameDirectory = string.IsNullOrWhiteSpace(_game) ? null : _game,
+            SteamDirectory = string.IsNullOrWhiteSpace(_steam) ? null : _steam,
+            ProtonPath = string.IsNullOrWhiteSpace(_proton) ? null : _proton,
+            PakKey = hasPakKey ? _pakKey!.Trim() : null,
+            ContainerKey = hasPakKey ? _containerKey!.Trim() : null,
+        }.Save(Paths);
+        _message = "Saved.";
+        _messageKind = "ok";
+    }
+}

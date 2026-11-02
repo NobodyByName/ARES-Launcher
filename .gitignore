@@ -1,0 +1,13 @@
+bin/
+obj/
+artifacts/
+TestResults/
+.vs/
+.idea/
+*.user
+
+# Secrets (never commit): game archive keys, and the operator token and identity key from the
+# ARES-Server README
+archive-keys.txt
+operator-token
+identity-key

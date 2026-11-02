@@ -1,0 +1,43 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AssemblyName>ARES-Launcher</AssemblyName>
+    <Description>ARES-Launcher selects independent ARES hosts and launches the original ARC Raiders client.</Description>
+    <RootNamespace>Ares.Launcher.App</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../Ares.Launcher.Core/Ares.Launcher.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Update="wwwroot/**" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Photino.Blazor" />
+  </ItemGroup>
+
+  <!-- License and third-party notices travel with the binaries. -->
+  <ItemGroup>
+    <None Include="../../LICENSE;../../THIRD-PARTY-NOTICES.txt" Link="%(Filename)%(Extension)" Visible="false"
+          CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <!-- Copies each bundled package's own third-party notices to third-party/<package>.txt. -->
+  <Target Name="AresCollectPackageNotices" AfterTargets="ResolvePackageAssets">
+    <ItemGroup>
+      <_AresNoticePackage Include="@(RuntimeCopyLocalItems->'%(NuGetPackageId)/%(NuGetPackageVersion)'->Distinct())"
+                          Condition="'%(RuntimeCopyLocalItems.NuGetPackageId)' != ''" />
+      <_AresNoticeFile Include="$(NuGetPackageRoot)$([System.String]::Copy('%(_AresNoticePackage.Identity)').ToLowerInvariant())/THIRD-PARTY-NOTICES.*"
+                       PackageId="$([System.String]::Copy('%(_AresNoticePackage.Identity)').Split('/')[0])" />
+      <None Include="@(_AresNoticeFile)" Link="third-party/%(_AresNoticeFile.PackageId).txt" Visible="false"
+            CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    </ItemGroup>
+  </Target>
+
+</Project>

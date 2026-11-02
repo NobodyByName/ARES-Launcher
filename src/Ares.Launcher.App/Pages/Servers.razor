@@ -1,0 +1,236 @@
+@page "/"
+@inject ProfileStore Store
+@inject GameStarter Starter
+@inject LauncherPaths Paths
+@inject ServerStatusClient StatusClient
+@implements IDisposable
+
+<div class="titlebar">
+    <h1>Servers <span class="count">@_profiles.Count</span></h1>
+    <button class="quiet" @onclick="RefreshAll" disabled="@_refreshing">@(_refreshing ? "Checking…" : "Refresh")</button>
+</div>
+
+@if (_message is not null)
+{
+    <div class="notice @_messageKind" role="status">@_message</div>
+}
+@if (_gameDirectory is null)
+{
+    <div class="notice error">Game not found. Choose its folder in <a href="settings">Settings</a>.</div>
+}
+
+<div class="profiles">
+    @if (_profiles.Count == 0)
+    {
+        <div class="empty">
+            <strong>Your servers, ready to play.</strong>
+            <span>Add your first server to get started.</span>
+        </div>
+    }
+    @foreach (ServerProfile p in _profiles)
+    {
+        ServerStatus st = StatusOf(p);
+        <article class="card profile" @key="p.Id" aria-label="@p.Name">
+            <div class="profile-heading">
+                <h2 class="name">@p.Name</h2>
+                <button class="quiet remove" aria-label="Remove @p.Name" @onclick="() => _confirmRemove = p.Id" disabled="@_busy">Remove</button>
+            </div>
+            <div class="address">@p.Host:@p.Port</div>
+            <div class="server-status" aria-live="polite">
+                <span class="dot @st.State.ToString().ToLowerInvariant()"></span>
+                <span>@(st.State switch
+                {
+                    ServerState.Unknown => "Not checked",
+                    ServerState.Checking => "Checking…",
+                    _ => st.State.ToString(),
+                })</span>
+                @if (st.State == ServerState.Online)
+                {
+                    <span class="latency">@st.LatencyMs ms</span>
+                }
+            </div>
+            @if (st is { State: ServerState.Online, Document: { } d })
+            {
+                @if (!string.IsNullOrEmpty(d.Motd))
+                {
+                    <p class="motd">@d.Motd</p>
+                }
+                <div class="server-stats">
+                    <span><b>@d.PlayersInRaids</b> players in raids</span>
+                    <span><b>@(d.Raids?.Active ?? 0)/@(d.Raids?.Capacity ?? 0)</b> raids</span>
+                </div>
+                @if (!d.Matchmaking)
+                {
+                    <p class="warning">Matchmaking unavailable.</p>
+                }
+                @if (st.BuildMismatch(_installedBuild))
+                {
+                    <p class="warning">Build mismatch: server @d.GameBuild, installed @_installedBuild. Joining may fail.</p>
+                }
+            }
+            @if (_confirmRemove == p.Id)
+            {
+                <div class="confirm-remove" role="group" aria-label="Confirm removal">
+                    <span>Remove this server?</span>
+                    <div class="row">
+                        <button @onclick="() => _confirmRemove = null">Cancel</button>
+                        <button class="danger" @onclick="() => Remove(p)">Remove</button>
+                    </div>
+                </div>
+            }
+            else
+            {
+                <div class="profile-actions">
+                    <details class="server-details">
+                        <summary>Details</summary>
+                        <dl>
+                            @if (st.Document?.Name is { Length: > 0 } serverName)
+                            {
+                                <dt>Server</dt><dd>@serverName</dd>
+                            }
+                            <dt>Settings</dt><dd>@SettingsLabel(p.Settings)</dd>
+                            <dt>Last played</dt><dd>@(p.LastPlayed is { } t ? t.ToLocalTime().ToString("g") : "Never")</dd>
+                            @if (st.State == ServerState.Offline)
+                            {
+                                <dt>Connection</dt><dd>@st.Error</dd>
+                            }
+                        </dl>
+                    </details>
+                    <button class="primary play" @onclick="() => Play(p)" disabled="@(_busy || _gameDirectory is null)">Play</button>
+                </div>
+            }
+        </article>
+    }
+</div>
+
+<details class="card composer" open="@(_profiles.Count == 0)">
+    <summary>Add a server <span aria-hidden="true">+</span></summary>
+    <div class="form">
+        <div class="field">
+            <label for="server-name">Name</label>
+            <input id="server-name" @bind="_newName" placeholder="My friend's server" />
+        </div>
+        <div class="field">
+            <label for="server-address">Address</label>
+            <input id="server-address" @bind="_newAddress" placeholder="127.0.0.1:18080" aria-describedby="address-help" />
+            <p id="address-help" class="hint">Host or IP. Leave blank for this computer.</p>
+        </div>
+        <details class="settings-help">
+            <summary>Game settings</summary>
+            <div class="field">
+                <label for="server-settings">Settings profile</label>
+                <select id="server-settings" @bind="_newSettings" aria-describedby="settings-help">
+                    <option value="@SettingsMode.Shared">Shared with official game</option>
+                    <option value="@SettingsMode.OfficialCopy" disabled>Copy of official settings (coming soon)</option>
+                    <option value="@SettingsMode.Default" disabled>Default settings (coming soon)</option>
+                </select>
+                <p id="settings-help" class="hint">Options and key bindings are shared with official play. Private servers currently use default graphics.</p>
+            </div>
+        </details>
+        <button class="primary" @onclick="Add">Add server</button>
+    </div>
+</details>
+<p class="build-info">ARES-Launcher @LauncherVersion.Current · @(_installedBuild is null ? "Game build unknown" : $"Game build {_installedBuild}")</p>
+
+@code {
+    private List<ServerProfile> _profiles = [];
+    private string? _gameDirectory;
+    private string _newName = "";
+    private string _newAddress = "";
+    private SettingsMode _newSettings = SettingsMode.Shared;
+    private string? _confirmRemove;
+    private string? _message;
+    private string _messageKind = "info";
+    private bool _busy;
+    private bool _refreshing;
+    private string? _installedBuild;
+    private readonly Dictionary<string, ServerStatus> _status = new();
+    private readonly CancellationTokenSource _stop = new();
+
+    private ServerStatus StatusOf(ServerProfile p) => _status.TryGetValue(p.Id, out ServerStatus? s) ? s : ServerStatus.Unknown;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _ = AutoRefresh();
+        await RefreshAll();
+    }
+
+    private async Task AutoRefresh()
+    {
+        using PeriodicTimer timer = new(TimeSpan.FromSeconds(15));
+        try
+        {
+            while (await timer.WaitForNextTickAsync(_stop.Token)) await InvokeAsync(RefreshAll);
+        }
+        catch (OperationCanceledException) { }
+    }
+
+    private async Task RefreshAll()
+    {
+        if (_refreshing) return;
+        _refreshing = true;
+        foreach (ServerProfile p in _profiles.Where(p => !_status.ContainsKey(p.Id))) _status[p.Id] = new ServerStatus(ServerState.Checking);
+        StateHasChanged();
+        (string Id, ServerStatus Status)[] results = await Task.WhenAll(_profiles.Select(async p => (p.Id, await StatusClient.PingAsync(p, _stop.Token))));
+        foreach ((string id, ServerStatus status) in results) _status[id] = status;
+        _refreshing = false;
+        StateHasChanged();
+    }
+
+    public void Dispose() => _stop.Cancel();
+
+    protected override void OnInitialized()
+    {
+        _profiles = Store.Load();
+        LauncherSettings settings = LauncherSettings.Load(Paths);
+        _gameDirectory = settings.GameDirectory is { Length: > 0 } g && GameInstall.IsValidGameDirectory(g)
+            ? g : GameInstall.FindGameDirectory(settings.SteamDirectory);
+        _installedBuild = _gameDirectory is null ? null : GameInstall.ReadInstalledBuild(_gameDirectory);
+    }
+
+    private static string SettingsLabel(SettingsMode mode) => mode switch
+    {
+        SettingsMode.Shared => "shared settings",
+        SettingsMode.OfficialCopy => "own settings (copied)",
+        _ => "own settings (default)",
+    };
+
+    private void Show(string text, string kind) { _message = text; _messageKind = kind; }
+
+    private void Add()
+    {
+        try
+        {
+            ServerProfile profile = Store.Add(_newName, _newAddress, _newSettings);
+            _profiles = Store.Load();
+            _newName = _newAddress = "";
+            Show($"Added {profile.Name} ({profile.Host}:{profile.Port}).", "ok");
+            _ = RefreshAll();
+        }
+        catch (FormatException e) { Show(e.Message, "error"); }
+    }
+
+    private void Remove(ServerProfile p)
+    {
+        Store.Remove(p.Id);
+        _confirmRemove = null;
+        _profiles = Store.Load();
+        Show($"Removed {p.Name}.", "ok");
+    }
+
+    private async Task Play(ServerProfile p)
+    {
+        _busy = true;
+        Show($"Preparing {p.Name}…", "info");
+        StateHasChanged();
+        try
+        {
+            LauncherSettings settings = LauncherSettings.Load(Paths);
+            await Task.Run(() => Starter.StartAsync(p, settings));
+            _profiles = Store.Load();
+            Show($"ARC Raiders is starting for {p.Name} ({p.Host}:{p.Port}).", "ok");
+        }
+        catch (Exception e) { Show(e.Message, "error"); }
+        finally { _busy = false; }
+    }
+}

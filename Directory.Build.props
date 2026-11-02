@@ -1,0 +1,40 @@
+<Project>
+  <PropertyGroup>
+    <Product>ARES</Product>
+    <Authors>ARES contributors</Authors>
+    <Company>ARES</Company>
+    <IsPackable>false</IsPackable>
+    <Deterministic>true</Deterministic>
+    <!-- Code style from .editorconfig is checked at build time; warnings fail the build. -->
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+    <PathMap>$(MSBuildThisFileDirectory)=/_/ARES-Launcher/</PathMap>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <DebugType>none</DebugType>
+    <DebugSymbols>false</DebugSymbols>
+  </PropertyGroup>
+
+  <!--
+    Version: YYYYMMDDNN, the release date plus a two-digit counter for releases on that day
+    (2026110201, 2026110202, ...). Change only AresVersion; it is the only version shown to people.
+    .NET version parts cannot exceed 65534, so the assembly and file versions stay 1.0.0.0.
+  -->
+  <PropertyGroup>
+    <AresVersion>2026110201</AresVersion>
+    <AresVersionValid>$([System.Text.RegularExpressions.Regex]::IsMatch('$(AresVersion)', '^20[0-9]{2}(0[1-9]|1[0-2])(0[1-9]|[12][0-9]|3[01])(0[1-9]|[1-9][0-9])$'))</AresVersionValid>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(AresVersionValid)' == 'true'">
+    <Version>1.0.0</Version>
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+    <FileVersion>1.0.0.0</FileVersion>
+    <InformationalVersion>$(AresVersion)</InformationalVersion>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+  </PropertyGroup>
+  <Target Name="AresCheckVersion" BeforeTargets="BeforeBuild" Condition="'$(AresVersionValid)' != 'true'">
+    <Error Text="AresVersion '$(AresVersion)' is not YYYYMMDDNN (a date followed by a counter from 01)." />
+  </Target>
+</Project>

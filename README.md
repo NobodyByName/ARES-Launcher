@@ -45,7 +45,7 @@ Limitations:
 | [ARES-Server](https://github.com/NobodyByName/ARES-Server) | The servers: ARES-Host (backend: sign-in, main menu, matchmaking) and ARES-Raid (runs the raid) |
 | ARES-Launcher | This player app: server list; starts the stock game for the chosen server |
 
-ARES supports one game build at a time: **Steam build 26159202**. The launcher depends on no
+ARES supports one game build at a time: **ARC Raiders 2.4.1, Steam build 26439197**. The launcher depends on no
 ARES-Server code and works with any ARES-Host for the game build installed on the player's machine.
 
 ## Requirements

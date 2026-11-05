@@ -10,9 +10,9 @@ using Ares.Launcher.Core.Config;
 using Ares.Launcher.Core.Game;
 using Ares.Launcher.Core.Profiles;
 
-const string SupportedBuild = "26159202";
-const string ConfigSha256 = "0aadfbc72f6b7b5c118c62499573dbf17c6a5c4597235c7039674d2c4556f300";
-const string LoopbackBootstrapSha256 = "6066ccdff20448193a3a7357fe28acf532fd58ab2ca0eab6e636d6780771f94c";
+const string SupportedBuild = "26439197";
+const string ConfigSha256 = "3b4aec6cbeadd8caf890dc10a56e8f4326303249fc05c52d06747dd97a480793";
+const string LoopbackBootstrapSha256 = "0e0b59bec0817fe291d3f146a0fc0e8dcc9e2614dbf8a91a2e94ea9e8190e7d0";
 
 if (args.Length is < 2 or > 3 || args[0] != "--keys")
 {

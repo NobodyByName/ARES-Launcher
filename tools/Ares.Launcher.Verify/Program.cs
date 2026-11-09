@@ -5,6 +5,7 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Security.Cryptography;
 using Ares.Launcher.Core;
+using Ares.Launcher.Core.Accounts;
 using Ares.Launcher.Core.Archives;
 using Ares.Launcher.Core.Config;
 using Ares.Launcher.Core.Game;
@@ -52,6 +53,7 @@ BinaryConfig.ParseResult keyed = BinaryConfig.Parse(BinaryConfig.BuildBootstrap(
 Check("launch key replaces the client secret in all three layers",
     keyed.Values.Where(v => v is { Branch: "Engine", Section: "EmbarkOnline", Key: "ClientSecret" }).Select(v => v.Text).ToList() is [_, _, _] secrets
     && secrets.All(text => text == launchKey));
+CheckSrpKnownAnswer();
 foreach ((string? text, string? host, int port) in new[] { ("", "127.0.0.1", ServerProfile.DefaultPort), ("192.0.2.24", "192.0.2.24", ServerProfile.DefaultPort),
              ("play.example.com:7000", "play.example.com", 7000), ("http://198.51.100.5:18081/", "198.51.100.5", 18081), ("[::1]:9000", "::1", 9000) })
 {
@@ -95,6 +97,22 @@ static ArchiveKeys ReadKeys(string path)
         Fail($"Cannot read the archive keys: {e.Message}");
         throw;
     }
+}
+
+// Known answer from the ARES-Host implementation: name "Alice", password "correct horse", salt
+// bytes 0..31, 1000 iterations, client secret 0x1234567, server secret 0x7654321.
+static void CheckSrpKnownAnswer()
+{
+    byte[] salt = [.. Enumerable.Range(0, 32).Select(i => (byte)i)];
+    byte[] serverPublic = Convert.FromBase64String(
+        "dNkH5GPWHyCSmgMcK0f2RNEUYsVCrUBRgX7HBtDj69oAH9aZRoVDd4sWindjwHCvRRj8JmRaC9fKaQHvi1R2JGuIwRK5A+afSeZ5pgmP/WJzI17ot7aaP7YpeN0PO5Ld" +
+        "0csNndiY6+fPuH7GHIdGpLhdhUCXwRpu0Rf1W4m9UUoubJRljt1GQqAGofRaDVkZ28dWw5L3DBUVlGid8fpr1opxEquZfggm5C5gterA6XSd+3Ygc5GAp2M8B4KI4jSm" +
+        "vPK3SK/WelwITCMi1/G8TBTH3mekeNpQTX5zfNKiT1Cwvzv0DuuWeooqAbmMvh6v+F2OXgpwAylZfYQeyzqhfw==");
+    Check("SRP verifier matches ARES-Host", Sha256(SrpClient.Verifier("correct horse", salt, 1000))
+        == "df79ae64ccc2bd988440948a5aaf011b27adc686990e276dbd204db534a2227b");
+    (byte[] proof, byte[] serverProof) = new SrpClient(0x1234567).Prove("Alice", "correct horse", salt, 1000, serverPublic);
+    Check("SRP client proof matches ARES-Host", Convert.ToHexStringLower(proof) == "90eb863b8091ef1feb92d3f15c942f463fcf61c8d6982bbfabb8dbfe158484d5");
+    Check("SRP server proof matches ARES-Host", Convert.ToHexStringLower(serverProof) == "81429913cec81ec0bb009eb63d6ed60406baaa227694449559a0d2c63dfab10c");
 }
 
 // Key parsing with dummy keys: pak key bytes 00..1F, container key words 1..8.

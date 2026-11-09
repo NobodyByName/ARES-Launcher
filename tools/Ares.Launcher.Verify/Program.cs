@@ -47,6 +47,11 @@ Check("extracted BinaryConfig.ini matches the stock build", Sha256(config) == Co
 string loopback = $"http://127.0.0.1:{ServerProfile.DefaultPort}";
 byte[] bin = BinaryConfig.BuildBootstrap(config, loopback, loopback);
 Check("loopback server.bin matches the known result", Sha256(bin) == LoopbackBootstrapSha256);
+string launchKey = Convert.ToBase64String(Enumerable.Range(0, 32).Select(i => (byte)(255 - i)).ToArray());
+BinaryConfig.ParseResult keyed = BinaryConfig.Parse(BinaryConfig.BuildBootstrap(config, loopback, loopback, launchKey));
+Check("launch key replaces the client secret in all three layers",
+    keyed.Values.Where(v => v is { Branch: "Engine", Section: "EmbarkOnline", Key: "ClientSecret" }).Select(v => v.Text).ToList() is [_, _, _] secrets
+    && secrets.All(text => text == launchKey));
 foreach ((string? text, string? host, int port) in new[] { ("", "127.0.0.1", ServerProfile.DefaultPort), ("192.0.2.24", "192.0.2.24", ServerProfile.DefaultPort),
              ("play.example.com:7000", "play.example.com", 7000), ("http://198.51.100.5:18081/", "198.51.100.5", 18081), ("[::1]:9000", "::1", 9000) })
 {

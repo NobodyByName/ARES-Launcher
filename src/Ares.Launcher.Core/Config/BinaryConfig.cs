@@ -5,8 +5,8 @@ namespace Ares.Launcher.Core.Config;
 
 /// <summary>
 /// Reads the game's compiled config cache (PioneerGame/Config/BinaryConfig.ini) and writes the
-/// separate bootstrap file for <c>-textconfig -IniBootstrap=&lt;file&gt;</c>. Only the two
-/// [EmbarkOnline] connection origins change; every other value is preserved and re-verified.
+/// separate bootstrap file for <c>-textconfig -IniBootstrap=&lt;file&gt;</c>. Only the
+/// [EmbarkOnline] connection values change; every other value is preserved and re-verified.
 /// </summary>
 public static class BinaryConfig
 {
@@ -21,7 +21,8 @@ public static class BinaryConfig
 
     public sealed record Value(string Branch, string Layer, string Section, string Key, string Text, int Start, int End)
     {
-        public bool IsOrigin => Branch == "Engine" && Section == "EmbarkOnline" && Key is "Endpoint" or "OpenApiUrl";
+        public bool IsConnection(IReadOnlyDictionary<string, string> replacements) =>
+            Branch == "Engine" && Section == "EmbarkOnline" && replacements.ContainsKey(Key);
     }
 
     public sealed class ParseResult
@@ -81,23 +82,32 @@ public static class BinaryConfig
         return result;
     }
 
-    /// <summary>Builds the bootstrap file with the auth origin set to <paramref name="authOrigin"/> and the API origin set to <paramref name="apiOrigin"/> (e.g. http://host:port).</summary>
-    public static byte[] BuildBootstrap(byte[] source, string authOrigin, string apiOrigin)
+    /// <summary>
+    /// Builds the bootstrap file with the auth origin set to <paramref name="authOrigin"/> and the API origin set to
+    /// <paramref name="apiOrigin"/> (e.g. http://host:port). A <paramref name="clientSecret"/> replaces the client
+    /// secret the game presents when it signs in to the backend.
+    /// </summary>
+    public static byte[] BuildBootstrap(byte[] source, string authOrigin, string apiOrigin, string? clientSecret = null)
     {
         Dictionary<string, string> origins = new()
         {
             ["Endpoint"] = authOrigin.TrimEnd('/'),
             ["OpenApiUrl"] = apiOrigin.TrimEnd('/'),
         };
+        if (clientSecret is not null)
+        {
+            origins["ClientSecret"] = clientSecret;
+        }
+
         ParseResult parsed = Parse(source);
         if (source.Length - parsed.End != 4 || BinaryPrimitives.ReadInt32LittleEndian(source.AsSpan(parsed.End)) != 0)
         {
             throw new InvalidDataException("Unexpected compiled-config trailer");
         }
 
-        List<Value> selected = [.. parsed.Values.Where(v => v.IsOrigin)];
+        List<Value> selected = [.. parsed.Values.Where(v => v.IsConnection(origins))];
         HashSet<(string l, string k)> expected = [.. s_originLayers.SelectMany(l => origins.Keys.Select(k => (l, k)))];
-        if (selected.Count != 6 || !selected.Select(v => (v.Layer, v.Key)).ToHashSet().SetEquals(expected))
+        if (selected.Count != expected.Count || !selected.Select(v => (v.Layer, v.Key)).ToHashSet().SetEquals(expected))
         {
             throw new InvalidDataException("Unexpected connection-key layout in this game version");
         }
@@ -124,7 +134,7 @@ public static class BinaryConfig
                 throw new InvalidDataException("Generated config changed a configuration key");
             }
 
-            if (now.Text != (old.IsOrigin ? origins[old.Key] : old.Text))
+            if (now.Text != (old.IsConnection(origins) ? origins[old.Key] : old.Text))
             {
                 throw new InvalidDataException("Generated config changed an unrelated value");
             }

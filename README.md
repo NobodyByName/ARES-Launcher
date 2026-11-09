@@ -70,7 +70,13 @@ The verifier uses the auto-detected Steam install unless a game directory is giv
 installed build is not the supported one. Its checks need no server.
 
 In the launcher, add a server by address (`host`, `host:port` or `http://host:port`; the default
-port is 18080), then press Play. Game, Steam and Proton folders can be overridden in Settings.
+port is 18080), enter the account name and password the server's operator gave you, then press
+Play. Game, Steam and Proton folders can be overridden in Settings.
+
+Each Play signs in to the server with SRP-6a (`POST /ares/v1/sign-in/start` and `/finish`): the
+password never leaves your computer and is never stored; only the account name is remembered per
+server. The server returns a launch key for this one game start, which goes into that server's
+`server.bin` as the game's client secret.
 
 ## Configuration and data
 

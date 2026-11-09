@@ -24,6 +24,9 @@ public sealed partial record ServerProfile
     public SettingsMode Settings { get; init; } = SettingsMode.Shared;
     public DateTimeOffset? LastPlayed { get; init; }
 
+    /// <summary>The account last signed in with on this server; the password is never stored.</summary>
+    public string? AccountName { get; init; }
+
     public const int DefaultPort = 18080;
 
     [JsonIgnore] public string Origin => $"http://{(Host.Contains(':') ? $"[{Host}]" : Host)}:{Port}";

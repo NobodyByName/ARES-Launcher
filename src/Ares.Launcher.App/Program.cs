@@ -1,4 +1,5 @@
 using Ares.Launcher.Core;
+using Ares.Launcher.Core.Accounts;
 using Ares.Launcher.Core.Game;
 using Ares.Launcher.Core.Profiles;
 using Ares.Launcher.Core.Servers;
@@ -18,6 +19,7 @@ internal static class Program
         builder.Services.AddSingleton<GameStarter>();
         builder.Services.AddSingleton<ServerStatusClient>();
         builder.Services.AddSingleton<ArchiveKeysClient>();
+        builder.Services.AddSingleton<SignInClient>();
         builder.RootComponents.Add<App>("app");
 
         PhotinoBlazorApp app = builder.Build();

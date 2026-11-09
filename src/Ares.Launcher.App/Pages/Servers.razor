@@ -3,6 +3,7 @@
 @inject GameStarter Starter
 @inject LauncherPaths Paths
 @inject ServerStatusClient StatusClient
+@inject SignInClient SignIn
 @implements IDisposable
 
 <div class="titlebar">
@@ -96,8 +97,18 @@
                             }
                         </dl>
                     </details>
-                    <button class="primary play" @onclick="() => Play(p)" disabled="@(_busy || _gameDirectory is null)">Play</button>
                 </div>
+                <form class="sign-in" @onsubmit="() => Play(p)" aria-label="Sign in to @p.Name">
+                    <div class="field">
+                        <label for="account-@p.Id">Account</label>
+                        <input id="account-@p.Id" autocomplete="username" value="@AccountOf(p)" @oninput="e => SetAccount(p, e)" />
+                    </div>
+                    <div class="field">
+                        <label for="password-@p.Id">Password</label>
+                        <input id="password-@p.Id" type="password" autocomplete="current-password" value="@PasswordOf(p)" @oninput="e => SetPassword(p, e)" />
+                    </div>
+                    <button type="submit" class="primary play" disabled="@(_busy || _gameDirectory is null)">Play</button>
+                </form>
             }
         </article>
     }
@@ -145,7 +156,17 @@
     private bool _refreshing;
     private string? _installedBuild;
     private readonly Dictionary<string, ServerStatus> _status = new();
+    private readonly Dictionary<string, string> _accounts = new();
+    private readonly Dictionary<string, string> _passwords = new();
     private readonly CancellationTokenSource _stop = new();
+
+    private string AccountOf(ServerProfile p) => _accounts.TryGetValue(p.Id, out string? a) ? a : p.AccountName ?? "";
+
+    private string PasswordOf(ServerProfile p) => _passwords.GetValueOrDefault(p.Id, "");
+
+    private void SetAccount(ServerProfile p, ChangeEventArgs e) => _accounts[p.Id] = e.Value?.ToString() ?? "";
+
+    private void SetPassword(ServerProfile p, ChangeEventArgs e) => _passwords[p.Id] = e.Value?.ToString() ?? "";
 
     private ServerStatus StatusOf(ServerProfile p) => _status.TryGetValue(p.Id, out ServerStatus? s) ? s : ServerStatus.Unknown;
 
@@ -221,12 +242,19 @@
     private async Task Play(ServerProfile p)
     {
         _busy = true;
-        Show($"Preparing {p.Name}…", "info");
+        Show($"Signing in to {p.Name}…", "info");
         StateHasChanged();
         try
         {
+            string password = PasswordOf(p);
+            _passwords.Remove(p.Id);
+            SignInResult account = await SignIn.SignInAsync(p, AccountOf(p), password);
+            Store.Update(p with { AccountName = account.Name });
+            _accounts.Remove(p.Id);
+            Show($"Signed in as {account.Name}. Preparing {p.Name}…", "info");
+            StateHasChanged();
             LauncherSettings settings = LauncherSettings.Load(Paths);
-            await Task.Run(() => Starter.StartAsync(p, settings));
+            await Task.Run(() => Starter.StartAsync(Store.Load().Single(q => q.Id == p.Id), settings, account.LaunchKey));
             _profiles = Store.Load();
             Show($"ARC Raiders is starting for {p.Name} ({p.Host}:{p.Port}).", "ok");
         }

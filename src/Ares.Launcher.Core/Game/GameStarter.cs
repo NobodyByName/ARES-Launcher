@@ -15,8 +15,11 @@ public sealed class GameStarter(ProfileStore store, ArchiveKeysClient archiveKey
 {
     private const string ConfigFileName = "server.bin";
 
-    /// <summary>Writes the profile's server.bin (regenerated every launch, so game updates are picked up).</summary>
-    private string PrepareConfig(ServerProfile profile, string gameDirectory, ArchiveKeys keys)
+    /// <summary>
+    /// Writes the profile's server.bin (regenerated every launch, so game updates are picked up) with
+    /// this start's launch key as the game's client secret.
+    /// </summary>
+    private string PrepareConfig(ServerProfile profile, string gameDirectory, ArchiveKeys keys, string launchKey)
     {
         if (!GameInstall.IsValidGameDirectory(gameDirectory))
         {
@@ -35,7 +38,7 @@ public sealed class GameStarter(ProfileStore store, ArchiveKeysClient archiveKey
         }
 
         byte[] source = pak.Extract("../../../PioneerGame/Config/BinaryConfig.ini");
-        byte[] bin = BinaryConfig.BuildBootstrap(source, profile.Origin, profile.Origin);
+        byte[] bin = BinaryConfig.BuildBootstrap(source, profile.Origin, profile.Origin, launchKey);
         string dir = store.DirectoryFor(profile);
         Directory.CreateDirectory(dir);
         string target = Path.Combine(dir, ConfigFileName);
@@ -63,7 +66,8 @@ public sealed class GameStarter(ProfileStore store, ArchiveKeysClient archiveKey
         }
     }
 
-    public async Task<Process> StartAsync(ServerProfile profile, LauncherSettings settings, CancellationToken cancel = default)
+    /// <summary>Starts the game for <paramref name="profile"/>, signed in with <paramref name="launchKey"/> from <see cref="Accounts.SignInClient"/>.</summary>
+    public async Task<Process> StartAsync(ServerProfile profile, LauncherSettings settings, string launchKey, CancellationToken cancel = default)
     {
         if (profile.Settings != SettingsMode.Shared)
         {
@@ -73,7 +77,7 @@ public sealed class GameStarter(ProfileStore store, ArchiveKeysClient archiveKey
         string gameDir = settings.GameDirectory is { Length: > 0 } g ? g : GameInstall.FindGameDirectory(settings.SteamDirectory)
             ?? throw new InvalidOperationException("ARC Raiders installation not found. Set the game folder in Settings.");
         ArchiveKeys keys = await KeysForAsync(profile, settings, cancel);
-        string config = PrepareConfig(profile, gameDir, keys);
+        string config = PrepareConfig(profile, gameDir, keys, launchKey);
         string exe = Path.Combine(gameDir, GameInstall.ExecutableRelative);
         ProcessStartInfo info;
         if (OperatingSystem.IsWindows())

@@ -18,6 +18,9 @@ public sealed class SrpClient
     /// <summary>Most PBKDF2 iterations accepted from a server, so a server cannot stall the launcher.</summary>
     private const int MaximumIterations = 2000000;
 
+    /// <summary>Length of the PBKDF2 output in bytes.</summary>
+    public const int StretchedBytes = 64;
+
     private static readonly BigInteger s_n = BigInteger.Parse(
         "0AC6BDB41324A9A9BF166DE5E1389582FAF72B6651987EE07FC3192943DB56050A37329CBB4A099ED8193E0757767A13DD52312AB4B03310D" +
         "CD7F48A9DA04FD50E8083969EDB767B0CF6095179A163AB3661A05FBD5FAAAE82918A9962F0B93B855F97993EC975EEAA80D740ADBF4FF747359D0" +
@@ -56,14 +59,24 @@ public sealed class SrpClient
     /// <exception cref="InvalidDataException">The challenge is invalid.</exception>
     public (byte[] Proof, byte[] ExpectedServerProof) Prove(string name, string password, byte[] salt, int iterations, byte[] serverPublic)
     {
+        CheckChallenge(salt, iterations);
+        return Prove(name, Stretch(password, salt, iterations), salt, serverPublic);
+    }
+
+    /// <summary>
+    /// Computes the proofs from a key made earlier by <see cref="Stretch"/> with the same salt and iterations.
+    /// </summary>
+    /// <exception cref="InvalidDataException">The challenge is invalid.</exception>
+    public (byte[] Proof, byte[] ExpectedServerProof) Prove(string name, byte[] stretched, byte[] salt, byte[] serverPublic)
+    {
         BigInteger b = Number(serverPublic);
-        if (serverPublic.Length != ModulusBytes || b % s_n == 0 || iterations is < 1 or > MaximumIterations || salt.Length is < 16 or > 64)
+        if (serverPublic.Length != ModulusBytes || b % s_n == 0 || stretched.Length != StretchedBytes)
         {
             throw new InvalidDataException("The server sent an invalid sign-in challenge.");
         }
 
+        CheckChallenge(salt, 1);
         string nameKey = NameKey(name);
-        byte[] stretched = Rfc2898DeriveBytes.Pbkdf2(Encoding.UTF8.GetBytes(password), salt, iterations, HashAlgorithmName.SHA512, 64);
         BigInteger x = Number(Hash(salt, stretched));
         BigInteger u = Number(Hash(PublicValue, serverPublic));
         if (u == 0)
@@ -85,10 +98,25 @@ public sealed class SrpClient
     }
 
     /// <summary>The verifier a server stores for this password (for known-answer checks).</summary>
-    public static byte[] Verifier(string password, byte[] salt, int iterations)
+    public static byte[] Verifier(string password, byte[] salt, int iterations) =>
+        Pad(BigInteger.ModPow(s_g, Number(Hash(salt, Stretch(password, salt, iterations))), s_n));
+
+    /// <summary>
+    /// The slow PBKDF2 step of <c>x</c>. It signs in to this one account (until its password changes) without revealing the password.
+    /// </summary>
+    /// <exception cref="InvalidDataException">The salt or iteration count is out of range.</exception>
+    public static byte[] Stretch(string password, byte[] salt, int iterations)
     {
-        byte[] stretched = Rfc2898DeriveBytes.Pbkdf2(Encoding.UTF8.GetBytes(password), salt, iterations, HashAlgorithmName.SHA512, 64);
-        return Pad(BigInteger.ModPow(s_g, Number(Hash(salt, stretched)), s_n));
+        CheckChallenge(salt, iterations);
+        return Rfc2898DeriveBytes.Pbkdf2(Encoding.UTF8.GetBytes(password), salt, iterations, HashAlgorithmName.SHA512, StretchedBytes);
+    }
+
+    private static void CheckChallenge(byte[] salt, int iterations)
+    {
+        if (iterations is < 1 or > MaximumIterations || salt.Length is < 16 or > 64)
+        {
+            throw new InvalidDataException("The server sent an invalid sign-in challenge.");
+        }
     }
 
     private static byte[] Pad(BigInteger value)

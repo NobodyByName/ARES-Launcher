@@ -113,6 +113,8 @@ static void CheckSrpKnownAnswer()
     (byte[] proof, byte[] serverProof) = new SrpClient(0x1234567).Prove("Alice", "correct horse", salt, 1000, serverPublic);
     Check("SRP client proof matches ARES-Host", Convert.ToHexStringLower(proof) == "90eb863b8091ef1feb92d3f15c942f463fcf61c8d6982bbfabb8dbfe158484d5");
     Check("SRP server proof matches ARES-Host", Convert.ToHexStringLower(serverProof) == "81429913cec81ec0bb009eb63d6ed60406baaa227694449559a0d2c63dfab10c");
+    (byte[] savedProof, _) = new SrpClient(0x1234567).Prove("Alice", SrpClient.Stretch("correct horse", salt, 1000), salt, serverPublic);
+    Check("SRP proof from a saved key matches", savedProof.SequenceEqual(proof));
 }
 
 // Key parsing with dummy keys: pak key bytes 00..1F, container key words 1..8.

@@ -78,11 +78,17 @@ password never leaves your computer and is never stored; only the account name i
 server. The server returns a launch key for this one game start, which goes into that server's
 `server.bin` as the game's client secret.
 
+With "Remember me" checked, Play also keeps the stretched SRP key (PBKDF2 of the password with the
+server's salt) in that server's profile folder as `sign-in.json`, readable only by the system user
+running the launcher, so the next Play works with an empty password field. That key is not the
+password, but it signs in to that account on that server until its password changes. Unchecking
+"Remember me" deletes it on the next Play, and removing the server deletes it too.
+
 ## Configuration and data
 
 Data lives in `~/.local/share/ARES-Launcher` (Linux) or `%APPDATA%\ARES-Launcher` (Windows):
-`profiles.json`, `settings.json`, `profiles/<id>/server.bin`. `XDG_DATA_HOME` overrides the Linux
-base directory.
+`profiles.json`, `settings.json`, `profiles/<id>/server.bin` and, with "Remember me",
+`profiles/<id>/sign-in.json`. `XDG_DATA_HOME` overrides the Linux base directory.
 
 The desktop executable is `ARES-Launcher` (`ARES-Launcher.exe` on Windows). Assemblies, namespaces
 and embedded resource names use `Ares.Launcher`. Builds map authored source paths to

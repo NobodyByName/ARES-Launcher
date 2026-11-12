@@ -105,9 +105,14 @@
                     </div>
                     <div class="field">
                         <label for="password-@p.Id">Password</label>
-                        <input id="password-@p.Id" type="password" autocomplete="current-password" value="@PasswordOf(p)" @oninput="e => SetPassword(p, e)" />
+                        <input id="password-@p.Id" type="password" autocomplete="current-password" value="@PasswordOf(p)" @oninput="e => SetPassword(p, e)"
+                               placeholder="@(SavedOf(p)?.Matches(AccountOf(p)) == true ? "Saved" : null)" />
                     </div>
                     <button type="submit" class="primary play" disabled="@(_busy || _gameDirectory is null)">Play</button>
+                    <label class="remember">
+                        <input type="checkbox" checked="@RememberOf(p)" @onchange="e => _remember[p.Id] = e.Value is true" />
+                        Remember me
+                    </label>
                 </form>
             }
         </article>
@@ -158,6 +163,8 @@
     private readonly Dictionary<string, ServerStatus> _status = new();
     private readonly Dictionary<string, string> _accounts = new();
     private readonly Dictionary<string, string> _passwords = new();
+    private readonly Dictionary<string, bool> _remember = new();
+    private readonly Dictionary<string, SavedSignIn?> _saved = new();
     private readonly CancellationTokenSource _stop = new();
 
     private string AccountOf(ServerProfile p) => _accounts.TryGetValue(p.Id, out string? a) ? a : p.AccountName ?? "";
@@ -167,6 +174,10 @@
     private void SetAccount(ServerProfile p, ChangeEventArgs e) => _accounts[p.Id] = e.Value?.ToString() ?? "";
 
     private void SetPassword(ServerProfile p, ChangeEventArgs e) => _passwords[p.Id] = e.Value?.ToString() ?? "";
+
+    private SavedSignIn? SavedOf(ServerProfile p) => _saved.TryGetValue(p.Id, out SavedSignIn? s) ? s : _saved[p.Id] = Store.LoadSignIn(p);
+
+    private bool RememberOf(ServerProfile p) => _remember.TryGetValue(p.Id, out bool r) ? r : SavedOf(p) is not null;
 
     private ServerStatus StatusOf(ServerProfile p) => _status.TryGetValue(p.Id, out ServerStatus? s) ? s : ServerStatus.Unknown;
 
@@ -234,6 +245,8 @@
     private void Remove(ServerProfile p)
     {
         Store.Remove(p.Id);
+        _saved.Remove(p.Id);
+        _remember.Remove(p.Id);
         _confirmRemove = null;
         _profiles = Store.Load();
         Show($"Removed {p.Name}.", "ok");
@@ -248,7 +261,30 @@
         {
             string password = PasswordOf(p);
             _passwords.Remove(p.Id);
-            SignInResult account = await SignIn.SignInAsync(p, AccountOf(p), password);
+            SavedSignIn? saved = SavedOf(p);
+            SignInResult account;
+            try
+            {
+                account = await SignIn.SignInAsync(p, AccountOf(p), password, saved);
+            }
+            catch (SignInRejectedException) when (password.Length == 0 && saved is not null)
+            {
+                Store.ForgetSignIn(p);
+                _saved[p.Id] = null;
+                throw;
+            }
+
+            if (RememberOf(p))
+            {
+                Store.SaveSignIn(p, account.Saved);
+                _saved[p.Id] = account.Saved;
+            }
+            else
+            {
+                Store.ForgetSignIn(p);
+                _saved[p.Id] = null;
+            }
+
             Store.Update(p with { AccountName = account.Name });
             _accounts.Remove(p.Id);
             Show($"Signed in as {account.Name}. Preparing {p.Name}…", "info");

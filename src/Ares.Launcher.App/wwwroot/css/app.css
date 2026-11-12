@@ -54,6 +54,8 @@ button.primary { background: var(--accent); border-color: var(--accent); color: 
 button.primary:hover:not(:disabled) { background: #ffdb68; }
 button.play { min-width: 112px; }
 .sign-in { display: grid; grid-template-columns: 1fr 1fr auto; gap: 12px; align-items: end; margin-top: 16px; }
+.sign-in .remember { grid-column: 1 / -1; display: flex; align-items: center; gap: 8px; color: var(--muted); cursor: pointer; }
+.sign-in .remember input { width: auto; margin: 0; accent-color: var(--accent); }
 @media (max-width: 460px) { .sign-in { grid-template-columns: 1fr; } }
 button.quiet { background: transparent; color: var(--muted); border-color: transparent; font-size: 12px; }
 button.quiet:hover:not(:disabled) { background: #2a2e37; color: var(--text); }

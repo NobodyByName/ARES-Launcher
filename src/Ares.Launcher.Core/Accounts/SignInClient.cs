@@ -7,8 +7,14 @@ using Ares.Launcher.Core.Profiles;
 
 namespace Ares.Launcher.Core.Accounts;
 
-/// <summary>A successful sign-in: the account name as stored on the server and the launch key for one game start.</summary>
-public sealed record SignInResult(string Name, string LaunchKey);
+/// <summary>
+/// A successful sign-in: the account name as stored on the server, the launch key for one game start and the key
+/// that can sign in again without the password (see <see cref="SavedSignIn"/>).
+/// </summary>
+public sealed record SignInResult(string Name, string LaunchKey, SavedSignIn Saved);
+
+/// <summary>The server refused the account name and password, or a saved sign-in no longer works.</summary>
+public sealed class SignInRejectedException(string message) : InvalidOperationException(message);
 
 /// <summary>Reply of <c>POST /ares/v1/sign-in/start</c>.</summary>
 public sealed record SignInStartResponse
@@ -35,15 +41,23 @@ public sealed class SignInClient : IDisposable
 
     private readonly HttpClient _http = new() { Timeout = TimeSpan.FromSeconds(15), MaxResponseContentBufferSize = 65536 };
 
+    /// <summary>Signs in with <paramref name="password"/>, or with <paramref name="saved"/> when the password is empty.</summary>
+    /// <exception cref="SignInRejectedException">The account name, password or saved sign-in was refused.</exception>
     /// <exception cref="InvalidOperationException">Sign-in failed; the message is meant for the player.</exception>
-    public async Task<SignInResult> SignInAsync(ServerProfile profile, string name, string password, CancellationToken cancel = default)
+    public async Task<SignInResult> SignInAsync(ServerProfile profile, string name, string? password, SavedSignIn? saved = null,
+        CancellationToken cancel = default)
     {
-        if (string.IsNullOrWhiteSpace(name) || string.IsNullOrEmpty(password))
+        name = name.Trim();
+        if (string.IsNullOrEmpty(password) && saved?.Matches(name) != true)
+        {
+            saved = null;
+        }
+
+        if (name.Length == 0 || (string.IsNullOrEmpty(password) && saved is null))
         {
             throw new InvalidOperationException("Enter your account name and password.");
         }
 
-        name = name.Trim();
         SrpClient srp = new();
         try
         {
@@ -54,8 +68,22 @@ public sealed class SignInClient : IDisposable
                 throw new JsonException("Incomplete sign-in challenge");
             }
 
-            (byte[] proof, byte[] expected) = await Task.Run(() => srp.Prove(name, password, Convert.FromBase64String(salt),
-                challenge.Iterations, Convert.FromBase64String(serverPublic)), cancel);
+            byte[] saltBytes = Convert.FromBase64String(salt);
+            byte[] stretched;
+            if (!string.IsNullOrEmpty(password))
+            {
+                stretched = await Task.Run(() => SrpClient.Stretch(password, saltBytes, challenge.Iterations), cancel);
+            }
+            else if (saved!.Salt == salt && saved.Iterations == challenge.Iterations)
+            {
+                stretched = Convert.FromBase64String(saved.Key);
+            }
+            else
+            {
+                throw new SignInRejectedException("Your saved password no longer works on this server. Enter your password.");
+            }
+
+            (byte[] proof, byte[] expected) = srp.Prove(name, stretched, saltBytes, Convert.FromBase64String(serverPublic));
             using HttpResponseMessage completed = await PostAsync(profile.Origin + FinishPath, new { session, proof = Convert.ToBase64String(proof) }, cancel);
             SignInFinishResponse? finished = await completed.Content.ReadFromJsonAsync<SignInFinishResponse>(cancel);
             if (finished is not { Proof: { } serverProof, Name: { } accountName }
@@ -65,7 +93,7 @@ public sealed class SignInClient : IDisposable
             }
 
             return finished.LaunchKey is { Length: 44 } key
-                ? new SignInResult(accountName, key)
+                ? new SignInResult(accountName, key, new SavedSignIn(accountName, salt, challenge.Iterations, Convert.ToBase64String(stretched)))
                 : throw new InvalidOperationException("The server sent an invalid launch key.");
         }
         catch (Exception e) when (e is FormatException or InvalidDataException or JsonException)
@@ -96,7 +124,7 @@ public sealed class SignInClient : IDisposable
         {
             throw response.StatusCode switch
             {
-                HttpStatusCode.Unauthorized or HttpStatusCode.BadRequest => new InvalidOperationException("Wrong account name or password."),
+                HttpStatusCode.Unauthorized or HttpStatusCode.BadRequest => new SignInRejectedException("Wrong account name or password."),
                 HttpStatusCode.Forbidden => new InvalidOperationException("This account is banned on this server."),
                 HttpStatusCode.NotFound or HttpStatusCode.NotImplemented => new InvalidOperationException("This server does not support account sign-in."),
                 _ => new InvalidOperationException($"Sign-in failed (HTTP {(int)response.StatusCode})."),

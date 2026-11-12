@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
+using Ares.Launcher.Core.Accounts;
 
 namespace Ares.Launcher.Core.Profiles;
 
@@ -24,7 +25,7 @@ public sealed partial record ServerProfile
     public SettingsMode Settings { get; init; } = SettingsMode.Shared;
     public DateTimeOffset? LastPlayed { get; init; }
 
-    /// <summary>The account last signed in with on this server; the password is never stored.</summary>
+    /// <summary>The account last signed in with on this server; the password itself is never stored (see <see cref="SavedSignIn"/>).</summary>
     public string? AccountName { get; init; }
 
     public const int DefaultPort = 18080;
@@ -93,6 +94,59 @@ public sealed partial class ProfileStore(LauncherPaths paths)
     }
 
     public string DirectoryFor(ServerProfile profile) => Path.Combine(ProfilesDirectory, profile.Id);
+
+    private string SignInFile(ServerProfile profile) => Path.Combine(DirectoryFor(profile), "sign-in.json");
+
+    /// <summary>The "Remember me" sign-in for this server, or null when there is none or the file is unreadable.</summary>
+    public SavedSignIn? LoadSignIn(ServerProfile profile)
+    {
+        if (!File.Exists(SignInFile(profile)))
+        {
+            return null;
+        }
+
+        try
+        {
+            SavedSignIn? saved = JsonSerializer.Deserialize<SavedSignIn>(File.ReadAllText(SignInFile(profile)));
+            return saved is { Name.Length: > 0, Salt.Length: > 0, Iterations: > 0 }
+                && Convert.TryFromBase64String(saved.Key, new byte[SrpClient.StretchedBytes], out int length) && length == SrpClient.StretchedBytes
+                ? saved
+                : null;
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or JsonException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>Saves the sign-in so this server's Play works without the password (readable by the current user only).</summary>
+    public void SaveSignIn(ServerProfile profile, SavedSignIn saved)
+    {
+        string file = SignInFile(profile);
+        Directory.CreateDirectory(Path.GetDirectoryName(file)!);
+        string temp = file + ".tmp";
+        File.Delete(temp);
+        FileStreamOptions options = new() { Mode = FileMode.CreateNew, Access = FileAccess.Write };
+        if (!OperatingSystem.IsWindows())
+        {
+            options.UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite;
+        }
+
+        using (StreamWriter writer = new(temp, options))
+        {
+            writer.Write(JsonSerializer.Serialize(saved));
+        }
+
+        File.Move(temp, file, overwrite: true);
+    }
+
+    public void ForgetSignIn(ServerProfile profile)
+    {
+        if (File.Exists(SignInFile(profile)))
+        {
+            File.Delete(SignInFile(profile));
+        }
+    }
 
     public ServerProfile Add(string name, string address, SettingsMode settings)
     {

@@ -20,6 +20,7 @@ internal static class Program
         builder.Services.AddSingleton<ServerStatusClient>();
         builder.Services.AddSingleton<ArchiveKeysClient>();
         builder.Services.AddSingleton<SignInClient>();
+        builder.Services.AddSingleton<LaunchService>();
         builder.RootComponents.Add<App>("app");
 
         PhotinoBlazorApp app = builder.Build();

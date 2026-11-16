@@ -1,9 +1,8 @@
 @page "/"
 @inject ProfileStore Store
-@inject GameStarter Starter
+@inject LaunchService Launcher
 @inject LauncherPaths Paths
 @inject ServerStatusClient StatusClient
-@inject SignInClient SignIn
 @implements IDisposable
 
 <div class="titlebar">
@@ -259,40 +258,21 @@
         {
             string password = PasswordOf(p);
             _passwords.Remove(p.Id);
-            SavedSignIn? saved = SavedOf(p);
-            SignInResult account;
-            try
+            await Launcher.PlayAsync(p, AccountOf(p), password, RememberOf(p), name =>
             {
-                account = await SignIn.SignInAsync(p, AccountOf(p), password, saved);
-            }
-            catch (SignInRejectedException) when (password.Length == 0 && saved is not null)
-            {
-                Store.ForgetSignIn(p);
-                _saved[p.Id] = null;
-                throw;
-            }
-
-            if (RememberOf(p))
-            {
-                Store.SaveSignIn(p, account.Saved);
-                _saved[p.Id] = account.Saved;
-            }
-            else
-            {
-                Store.ForgetSignIn(p);
-                _saved[p.Id] = null;
-            }
-
-            Store.Update(p with { AccountName = account.Name });
-            _accounts.Remove(p.Id);
-            Show($"Signed in as {account.Name}. Preparing {p.Name}…", "info");
-            StateHasChanged();
-            LauncherSettings settings = LauncherSettings.Load(Paths);
-            await Task.Run(() => Starter.StartAsync(Store.Load().Single(q => q.Id == p.Id), settings, account.LaunchKey));
+                _accounts.Remove(p.Id);
+                _saved.Remove(p.Id);
+                Show($"Signed in as {name}. Preparing {p.Name}…", "info");
+                StateHasChanged();
+            });
             _profiles = Store.Load();
             Show($"ARC Raiders is starting for {p.Name} ({p.Host}:{p.Port}).", "ok");
         }
         catch (Exception e) { Show(e.Message, "error"); }
-        finally { _busy = false; }
+        finally
+        {
+            _saved.Remove(p.Id);
+            _busy = false;
+        }
     }
 }

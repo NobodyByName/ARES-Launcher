@@ -72,7 +72,31 @@ public static partial class GameInstall
         }
     }
 
-    public static string? FindGameDirectory(string? steamRoot = null) =>
+    /// <summary>
+    /// Resolves the installation the launcher uses from <paramref name="settings"/>: each folder set in Settings is
+    /// used as given, except a game folder that does not contain the game, which counts as not found. Empty settings
+    /// are auto-detected, the game in the configured client folder's libraries (or every known one) and Proton from
+    /// the configured client folder (or the first one found). Proton fields stay null on Windows, where the game runs
+    /// directly.
+    /// </summary>
+    public static ResolvedGameInstall Resolve(LauncherSettings settings)
+    {
+        string? steamSetting = settings.SteamDirectory is { Length: > 0 } s ? s : null;
+        string? gameDirectory = settings.GameDirectory is { Length: > 0 } g
+            ? IsValidGameDirectory(g) ? g : null
+            : FindGameDirectory(steamSetting);
+        if (OperatingSystem.IsWindows())
+        {
+            return new ResolvedGameInstall(gameDirectory, null, null, null);
+        }
+
+        string? steamDirectory = steamSetting ?? FindSteamRoot();
+        string? compatData = gameDirectory is null ? null : FindCompatData(gameDirectory);
+        string? proton = settings.ProtonPath is { Length: > 0 } p ? p : FindProton(steamDirectory, compatData);
+        return new ResolvedGameInstall(gameDirectory, steamDirectory, compatData, proton);
+    }
+
+    private static string? FindGameDirectory(string? steamRoot) =>
         SteamLibraries(steamRoot)
             .Select(lib => Path.Combine(lib, "steamapps", "common", FolderName))
             .FirstOrDefault(IsValidGameDirectory);
@@ -96,10 +120,10 @@ public static partial class GameInstall
         return match.Success ? match.Groups[1].Value : null;
     }
 
-    public static string? FindSteamRoot() => SteamRoots().FirstOrDefault(r => Directory.Exists(Path.Combine(r, "steamapps")));
+    private static string? FindSteamRoot() => SteamRoots().FirstOrDefault(r => Directory.Exists(Path.Combine(r, "steamapps")));
 
     /// <summary>The game's Steam Proton prefix (compatdata), in the library holding the game.</summary>
-    public static string? FindCompatData(string gameDirectory)
+    private static string? FindCompatData(string gameDirectory)
     {
         string? library = Directory.GetParent(gameDirectory)?.Parent?.Parent?.FullName;
         if (library is null)
@@ -112,7 +136,7 @@ public static partial class GameInstall
     }
 
     /// <summary>Picks an installed Proton build, preferring the one that created the game's prefix.</summary>
-    public static string? FindProton(string? steamRoot, string? compatData)
+    private static string? FindProton(string? steamRoot, string? compatData)
     {
         List<string> candidates = [.. SteamLibraries(steamRoot)
             .SelectMany(lib => Directory.Exists(Path.Combine(lib, "steamapps", "common"))

@@ -64,10 +64,10 @@
     {
         LauncherSettings s = LauncherSettings.Load(Paths);
         (_game, _steam, _proton, _pakKey, _containerKey) = (s.GameDirectory, s.SteamDirectory, s.ProtonPath, s.PakKey, s.ContainerKey);
-        _detectedSteam = GameInstall.FindSteamRoot();
-        _detectedGame = GameInstall.FindGameDirectory(_steam is { Length: > 0 } ? _steam : null);
-        string? compat = _detectedGame is null ? null : GameInstall.FindCompatData(_detectedGame);
-        if (!OperatingSystem.IsWindows()) _detectedProton = GameInstall.FindProton(_detectedSteam, compat);
+        // Each placeholder is what a blank field resolves to with the other saved settings.
+        _detectedGame = GameInstall.Resolve(s with { GameDirectory = null }).GameDirectory;
+        _detectedSteam = GameInstall.Resolve(s with { SteamDirectory = null }).SteamDirectory;
+        _detectedProton = GameInstall.Resolve(s with { ProtonPath = null }).ProtonPath;
     }
 
     private void Save()

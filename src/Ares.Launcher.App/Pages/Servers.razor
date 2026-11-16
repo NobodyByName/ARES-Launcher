@@ -214,9 +214,7 @@
     protected override void OnInitialized()
     {
         _profiles = Store.Load();
-        LauncherSettings settings = LauncherSettings.Load(Paths);
-        _gameDirectory = settings.GameDirectory is { Length: > 0 } g && GameInstall.IsValidGameDirectory(g)
-            ? g : GameInstall.FindGameDirectory(settings.SteamDirectory);
+        _gameDirectory = GameInstall.Resolve(LauncherSettings.Load(Paths)).GameDirectory;
         _installedBuild = _gameDirectory is null ? null : GameInstall.ReadInstalledBuild(_gameDirectory);
     }
 

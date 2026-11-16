@@ -74,7 +74,8 @@ public sealed class GameStarter(ProfileStore store, ArchiveKeysClient archiveKey
             throw new NotSupportedException("Separate settings per profile are not implemented yet; use Shared.");
         }
 
-        string gameDir = settings.GameDirectory is { Length: > 0 } g ? g : GameInstall.FindGameDirectory(settings.SteamDirectory)
+        ResolvedGameInstall install = GameInstall.Resolve(settings);
+        string gameDir = install.GameDirectory
             ?? throw new InvalidOperationException("ARC Raiders installation not found. Set the game folder in Settings.");
         ArchiveKeys keys = await KeysForAsync(profile, settings, cancel);
         string config = PrepareConfig(profile, gameDir, keys, launchKey);
@@ -88,11 +89,11 @@ public sealed class GameStarter(ProfileStore store, ArchiveKeysClient archiveKey
         }
         else
         {
-            string steam = settings.SteamDirectory ?? GameInstall.FindSteamRoot()
+            string steam = install.SteamDirectory
                 ?? throw new InvalidOperationException("Steam installation not found.");
-            string compat = GameInstall.FindCompatData(gameDir)
+            string compat = install.CompatDataDirectory
                 ?? throw new InvalidOperationException("The game's Proton prefix was not found. Launch ARC Raiders once from Steam first.");
-            string proton = settings.ProtonPath is { Length: > 0 } p ? p : GameInstall.FindProton(steam, compat)
+            string proton = install.ProtonPath
                 ?? throw new InvalidOperationException("No Proton installation found. Set it in Settings.");
             info = new ProcessStartInfo(proton) { WorkingDirectory = Path.GetDirectoryName(exe)! };
             info.ArgumentList.Add("run");

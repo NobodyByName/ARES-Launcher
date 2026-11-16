@@ -22,7 +22,7 @@ if (args.Length is < 2 or > 3 || args[0] != "--keys")
 
 ArchiveKeys keys = ReadKeys(args[1]);
 
-string? game = args.Length > 2 ? args[2] : GameInstall.FindGameDirectory();
+string? game = args.Length > 2 ? args[2] : GameInstall.Resolve(new LauncherSettings()).GameDirectory;
 if (game is null)
 {
     Fail($"Game not found. Supply the directory of a stock ARC Raiders install, Steam build {SupportedBuild}.");

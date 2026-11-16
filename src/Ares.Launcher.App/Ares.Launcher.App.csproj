@@ -2,9 +2,6 @@
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <TargetFramework>net10.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
     <AssemblyName>ARES-Launcher</AssemblyName>
     <Description>ARES-Launcher selects independent ARES hosts and launches the original ARC Raiders client.</Description>
     <RootNamespace>Ares.Launcher.App</RootNamespace>

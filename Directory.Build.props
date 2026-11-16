@@ -1,5 +1,8 @@
 <Project>
   <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
     <Product>ARES</Product>
     <Authors>ARES contributors</Authors>
     <Company>ARES</Company>

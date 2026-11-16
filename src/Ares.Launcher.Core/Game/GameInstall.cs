@@ -10,6 +10,9 @@ public static partial class GameInstall
     public const string ExecutableRelative = "PioneerGame/Binaries/Win64/PioneerGame.exe";
     public const string ConfigPakRelative = "PioneerGame/Content/Paks/pakchunk0-WindowsClient.pak";
 
+    /// <summary>Entry of the compiled config cache inside the config pak.</summary>
+    public const string ConfigCacheEntry = "../../../PioneerGame/Config/BinaryConfig.ini";
+
     public static bool IsValidGameDirectory(string? dir) =>
         !string.IsNullOrWhiteSpace(dir)
         && File.Exists(Path.Combine(dir, ExecutableRelative))

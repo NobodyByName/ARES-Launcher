@@ -10,6 +10,15 @@ namespace Ares.Launcher.Core.Config;
 /// </summary>
 public static class BinaryConfig
 {
+    /// <summary>Config branch (INI file) holding the connection values.</summary>
+    public const string ConnectionBranch = "Engine";
+
+    /// <summary>Section holding the connection values.</summary>
+    public const string ConnectionSection = "EmbarkOnline";
+
+    /// <summary>Key of the client secret the game presents when it signs in to the backend.</summary>
+    public const string ClientSecretKey = "ClientSecret";
+
     private static readonly string[] s_originLayers = ["memory", "combined", "final"];
 
     private static readonly string[] s_knownFiles =
@@ -22,7 +31,7 @@ public static class BinaryConfig
     public sealed record Value(string Branch, string Layer, string Section, string Key, string Text, int Start, int End)
     {
         public bool IsConnection(IReadOnlyDictionary<string, string> replacements) =>
-            Branch == "Engine" && Section == "EmbarkOnline" && replacements.ContainsKey(Key);
+            Branch == ConnectionBranch && Section == ConnectionSection && replacements.ContainsKey(Key);
     }
 
     public sealed class ParseResult
@@ -96,7 +105,7 @@ public static class BinaryConfig
         };
         if (clientSecret is not null)
         {
-            origins["ClientSecret"] = clientSecret;
+            origins[ClientSecretKey] = clientSecret;
         }
 
         ParseResult parsed = Parse(source);

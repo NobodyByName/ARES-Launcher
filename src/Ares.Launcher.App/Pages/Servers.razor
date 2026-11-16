@@ -128,7 +128,7 @@
         </div>
         <div class="field">
             <label for="server-address">Address</label>
-            <input id="server-address" @bind="_newAddress" placeholder="127.0.0.1:18080" aria-describedby="address-help" />
+            <input id="server-address" @bind="_newAddress" placeholder="@($"127.0.0.1:{ServerProfile.DefaultPort}")" aria-describedby="address-help" />
             <p id="address-help" class="hint">Host or IP. Leave blank for this computer.</p>
         </div>
         <details class="settings-help">

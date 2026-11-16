@@ -37,7 +37,7 @@ public sealed class GameStarter(ProfileStore store, ArchiveKeysClient archiveKey
                 "The archive keys do not open your game files: the game may have updated, or the keys are wrong.", e);
         }
 
-        byte[] source = pak.Extract("../../../PioneerGame/Config/BinaryConfig.ini");
+        byte[] source = pak.Extract(GameInstall.ConfigCacheEntry);
         byte[] bin = BinaryConfig.BuildBootstrap(source, profile.Origin, profile.Origin, launchKey);
         string dir = store.DirectoryFor(profile);
         Directory.CreateDirectory(dir);

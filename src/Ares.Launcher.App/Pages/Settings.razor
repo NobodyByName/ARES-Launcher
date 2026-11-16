@@ -74,7 +74,7 @@
     {
         if (_game is { Length: > 0 } && !GameInstall.IsValidGameDirectory(_game))
         {
-            _message = "That folder does not contain ARC Raiders (PioneerGame/Binaries/Win64/PioneerGame.exe).";
+            _message = $"That folder does not contain ARC Raiders ({GameInstall.ExecutableRelative}).";
             _messageKind = "error";
             return;
         }

@@ -43,7 +43,7 @@ TheiaCrypto.SelfTest();
 Check($"launcher version {LauncherVersion.Current} is YYYYMMDDNN", LauncherVersion.Current is { Length: 10 } version && version.All(char.IsAsciiDigit));
 CheckKeyFormats();
 PakArchive pak = OpenPak(Path.Combine(game, GameInstall.ConfigPakRelative), keys);
-byte[] config = pak.Extract("../../../PioneerGame/Config/BinaryConfig.ini");
+byte[] config = pak.Extract(GameInstall.ConfigCacheEntry);
 Check("extracted BinaryConfig.ini matches the stock build", Sha256(config) == ConfigSha256);
 string loopback = $"http://127.0.0.1:{ServerProfile.DefaultPort}";
 byte[] bin = BinaryConfig.BuildBootstrap(config, loopback, loopback);
@@ -51,7 +51,7 @@ Check("loopback server.bin matches the known result", Sha256(bin) == LoopbackBoo
 string launchKey = Convert.ToBase64String(Enumerable.Range(0, 32).Select(i => (byte)(255 - i)).ToArray());
 BinaryConfig.ParseResult keyed = BinaryConfig.Parse(BinaryConfig.BuildBootstrap(config, loopback, loopback, launchKey));
 Check("launch key replaces the client secret in all three layers",
-    keyed.Values.Where(v => v is { Branch: "Engine", Section: "EmbarkOnline", Key: "ClientSecret" }).Select(v => v.Text).ToList() is [_, _, _] secrets
+    keyed.Values.Where(v => v is { Branch: BinaryConfig.ConnectionBranch, Section: BinaryConfig.ConnectionSection, Key: BinaryConfig.ClientSecretKey }).Select(v => v.Text).ToList() is [_, _, _] secrets
     && secrets.All(text => text == launchKey));
 CheckSrpKnownAnswer();
 foreach ((string? text, string? host, int port) in new[] { ("", "127.0.0.1", ServerProfile.DefaultPort), ("192.0.2.24", "192.0.2.24", ServerProfile.DefaultPort),

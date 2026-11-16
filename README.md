@@ -9,6 +9,13 @@ modified, and ordinary Steam launches keep connecting to the official servers.
 > by Embark Studios. ARC Raiders and all related names and trademarks belong to their respective
 > owners. ARES works only with an installed, unmodified copy of the game.
 
+> **Help wanted: multiplayer testers.** The launcher has only ever connected from one PC. If you
+> have ARC Raiders (build 26439197) and want to try joining an ARES server over the internet with
+> me, say hi in the
+> [Matrix room](https://matrix.to/#/#ares-arc-raiders-emulation-server:matrix.org) and we'll set
+> up a test session. Reports from Windows players are especially welcome, since Windows hasn't
+> been tested at all.
+
 ## Status
 
 - Verified on Linux (Proton, the game's normal prefix): a launcher-started game signs in to an

@@ -11,7 +11,7 @@ modified, and ordinary Steam launches keep connecting to the official servers.
 
 ## Help wanted: multiplayer testers
 
-The launcher has only ever connected from one PC. If you have ARC Raiders (build 26439197) and
+The launcher has only ever connected from one PC. If you have ARC Raiders and
 want to try joining an ARES server over the internet with me, say hi in the
 [Matrix room](https://matrix.to/#/#ares-arc-raiders-emulation-server:matrix.org) and we'll set up
 a test session. Reports from Windows players are especially welcome, since Windows hasn't been
@@ -53,8 +53,8 @@ Limitations:
 | [ARES-Server](https://github.com/NobodyByName/ARES-Server) | The servers: ARES-Host (backend: sign-in, main menu, matchmaking) and ARES-Raid (runs the raid) |
 | ARES-Launcher | This player app: server list; starts the stock game for the chosen server |
 
-ARES supports one game build at a time: **ARC Raiders 2.4.1, Steam build 26439197**. The launcher depends on no
-ARES-Server code and works with any ARES-Host for the game build installed on the player's machine.
+The client target for this trial is **ARC Raiders 2.6.0, Steam build 26619995**. The launcher verifier
+passes against this install. A stock-client connection to ARES-Host and a raid still need live verification.
 
 ## Requirements
 

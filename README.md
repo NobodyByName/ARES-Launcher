@@ -52,6 +52,7 @@ Limitations:
 | --- | --- |
 | [ARES-Server](https://github.com/NobodyByName/ARES-Server) | The servers: ARES-Host (backend: sign-in, main menu, matchmaking) and ARES-Raid (runs the raid) |
 | ARES-Launcher | This player app: server list; starts the stock game for the chosen server |
+| [ARES-Editor](https://github.com/NobodyByName/ARES-Editor) | Operator tool: shows a map's loot containers in 3D and edits the server's loot content |
 
 The client target for this trial is **ARC Raiders 2.6.0, Steam build 26619995**. The launcher verifier
 passes against this install. A stock-client connection to ARES-Host and a raid still need live verification.
